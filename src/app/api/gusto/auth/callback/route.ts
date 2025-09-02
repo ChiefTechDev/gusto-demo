@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createClient } from "@supabase/supabase-js";
+// import { cookies } from "next/headers";
+import { createClient } from "@/lib/supabase/server";
 
 function supabase() {
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+  return createClient();
 }
 
 async function exchangeCodeForToken(code: string) {
-  const OAUTH_BASE = process.env.GUSTO_OAUTH_BASE!;
+  const OAUTH_BASE = process.env.GUSTO_API_BASE!;
   const body = {
     client_id: process.env.GUSTO_CLIENT_ID!,
     client_secret: process.env.GUSTO_CLIENT_SECRET!,
@@ -41,26 +41,25 @@ async function fetchTokenInfo(accessToken: string) {
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
+  const sb = supabase();
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
-  const cookieState = (await cookies()).get("gusto_oauth_state")?.value;
 
-  if (!code || !state || state !== cookieState) {
+  if (!code || !state) {
     return NextResponse.json({ error: "Invalid OAuth state or missing code" }, { status: 400 });
   }
 
   // TODO: identify your signed-in user id
-  const userId = (await supabase().auth.getUser()).data.user?.id;
+  const userId = (await sb.auth.getUser()).data.user?.id;
   if (!userId) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
   const token = await exchangeCodeForToken(code);
   const info = await fetchTokenInfo(token.access_token);
 
   // Try to pick up company identifier (name varies in docs; often company_uuid or company_id)
-  const companyId = info.company_uuid || info.company_id || info.resource_id;
+  const companyId = info.resource.uuid || info.company_id || info.resource_id;
 
   const expiresAt = new Date(Date.now() + (token.expires_in - 60) * 1000).toISOString();
-  const sb = supabase();
   // Upsert by (user_id)
   const { error } = await sb
     .from("gusto_connections")

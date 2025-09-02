@@ -8,7 +8,7 @@ function supabase() {
 }
 
 async function refresh(access: { refresh_token: string }) {
-  const OAUTH_BASE = process.env.GUSTO_OAUTH_BASE!;
+  const OAUTH_BASE = process.env.GUSTO_API_BASE!;
   const body = {
     client_id: process.env.GUSTO_CLIENT_ID!,
     client_secret: process.env.GUSTO_CLIENT_SECRET!,
